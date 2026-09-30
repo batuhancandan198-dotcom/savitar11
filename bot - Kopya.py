@@ -1,8 +1,12 @@
+import os
 import telebot
 from telebot import types
 import ajaxapi  # Orijinal sorgu kütüphaneniz
 
-TOKEN = "8713739466:AAGAhV1XtsmmAjEWQktAbtZ4CkVZUKttsiQ"
+TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("BOT_TOKEN Railway Variables içinde tanımlı değil.")
+
 bot = telebot.TeleBot(TOKEN)
 
 # Kullanıcının hangi sorgu aşamasında olduğunu takip etmek için geçici hafıza
@@ -11,7 +15,7 @@ kullanici_durumu = {}
 # 1. ANA MENÜ (/start)
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    kullanici_durumu[message.chat.id] = None  # Durumu sıfırla
+    kullanici_durumu[message.chat.id] = None
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     
     buton1 = types.KeyboardButton('📸 Fotoğraf Bakma')
@@ -27,14 +31,11 @@ def handle_messages(message):
     chat_id = message.chat.id
     text = message.text
 
-    # Ana Menü Butonları
     if text == '📸 Fotoğraf Bakma':
         bot.send_message(chat_id, "📸 Fotoğraf bakma menüsündesiniz. Lütfen bir görsel gönderin.")
         
     elif text == '🔍 Sorgulama Yap' or text == '🔙 Sorgu Menüsüne Dön':
-        # Detaylı Sorgu Alt Menüsü
         markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-        
         markup.add(
             types.KeyboardButton('🆔 TC Sorgu'),
             types.KeyboardButton('💎 TC Pro Sorgu'),
@@ -57,10 +58,9 @@ def handle_messages(message):
     elif text == '🔙 Ana Menüye Dön':
         send_welcome(message)
 
-    # --- ALT SORGU SEÇENEKLERİNİN TETİKLENMESİ ---
     elif text in ['🆔 TC Sorgu', '💎 TC Pro Sorgu', '👨‍👩‍👧‍👦 Aile Sorgu', '🌳 Sülale Sorgu', '📱 TC -> GSM Sorgu', '🏫 E-Okul Sorgu', '🏠 Adres Sorgu', '📜 Tapu Sorgu']:
         kullanici_durumu[chat_id] = text
-        bot.send_message(chat_id, f"📝 Lütfen sorgulanacak **11 haneli TC Kimlik Numarasını** yazın:", parse_mode="Markdown")
+        bot.send_message(chat_id, "📝 Lütfen sorgulanacak **11 haneli TC Kimlik Numarasını** yazın:", parse_mode="Markdown")
 
     elif text == '👤 Ad Soyad Sorgu':
         kullanici_durumu[chat_id] = text
@@ -73,8 +73,6 @@ def handle_messages(message):
     elif text == '🗺️ Ada Parsel Sorgu':
         kullanici_durumu[chat_id] = text
         bot.send_message(chat_id, "📝 Lütfen İl ve İlçe bilgisini aralarında virgül bırakarak yazın\n_(Örn: İSTANBUL, KADIKÖY)_:")
-
-    # --- KULLANICI METİN YAZDIĞINDA (SORGU SONUÇLARININ HESAPLANMAS LEAL ALANI) ---
     else:
         durum = kullanici_durumu.get(chat_id)
         
@@ -85,7 +83,6 @@ def handle_messages(message):
         bot.send_message(chat_id, "⏳ Sorgulanıyor, lütfen bekleyin...")
         
         try:
-            # Seçilen duruma göre ajaxapi kütüphanesindeki ilgili fonksiyonu çağırıyoruz
             if durum == '🆔 TC Sorgu':
                 sonuc = ajaxapi.tc(text)
             elif durum == '💎 TC Pro Sorgu':
@@ -105,7 +102,6 @@ def handle_messages(message):
             elif durum == '📞 GSM -> TC Sorgu':
                 sonuc = ajaxapi.gsm_tc(text)
             elif durum == '👤 Ad Soyad Sorgu':
-                # Gelen metni boşluktan ikiye bölüp ad ve soyad olarak gönderiyoruz
                 parcalar = text.split(" ", 1)
                 ad = parcalar[0]
                 soyad = parcalar[1] if len(parcalar) > 1 else ""
@@ -116,15 +112,12 @@ def handle_messages(message):
                 ilce = parcalar[1].strip() if len(parcalar) > 1 else ""
                 sonuc = ajaxapi.ada_parsel(il, ilce)
 
-            # Sonucu Telegram'dan kullanıcılara gönderiyoruz
             bot.send_message(chat_id, f"📊 *Sorgu Sonucu:* \n\n{str(sonuc)}", parse_mode="Markdown")
             
         except Exception as e:
             bot.send_message(chat_id, f"❌ Sorgu sırasında bir hata oluştu veya kütüphane yanıt vermedi.\nHata: {str(e)}")
         
-        # Sorgu bittikten sonra kullanıcının durumunu sıfırlıyoruz
         kullanici_durumu[chat_id] = None
 
-# Kesintisiz çalışma döngüsü
 print("Telegram Gelişmiş Sorgu Botu Aktif! Mesajlar bekleniyor...")
 bot.infinity_polling()
