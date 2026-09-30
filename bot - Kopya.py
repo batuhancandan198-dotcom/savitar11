@@ -1,11 +1,17 @@
 import os
 import telebot
 from telebot import types
+from telebot import apihelper
 import ajaxapi
 
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN Railway Variables içinde tanımlı değil.")
+
+# Railway/egress proxy katmanlarında biriken Session header/cookie durumunun
+# Telegram API isteklerini 431 ile bozmasını önlemek için her Telegram isteğinde
+# yeni HTTP session kullan.
+apihelper.SESSION_TIME_TO_LIVE = 0
 
 bot = telebot.TeleBot(TOKEN)
 kullanici_durumu = {}
