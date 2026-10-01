@@ -6,6 +6,7 @@ from telebot import apihelper
 import ajaxapi
 
 TOKEN = os.getenv("BOT_TOKEN")
+SMSV_API_KEY = os.getenv("SMSV_API_KEY")
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN Railway Variables içinde tanımlı değil.")
 
@@ -26,6 +27,25 @@ def send_result_file(chat_id, sonuc):
         dosya,
         caption="📄 Sorgu sonucu dosya olarak hazır."
     )
+
+@bot.message_handler(commands=['smsdurum'])
+def sms_durum(message):
+    if not SMSV_API_KEY:
+        bot.send_message(message.chat.id, "❌ SMS Virtual API anahtarı Railway'de bulunamadı.")
+        return
+    try:
+        import urllib.request, json
+        req = urllib.request.Request("https://api.smsvirtual.io/v1/profile/", headers={"x-api-key": SMSV_API_KEY, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        if data.get("status") is True:
+            profile = data.get("data") or {}
+            balance = profile.get("balance", "bilinmiyor")
+            bot.send_message(message.chat.id, f"✅ SMS Virtual bağlantısı başarılı.\n💰 Bakiye: ${balance}")
+        else:
+            bot.send_message(message.chat.id, f"❌ SMS Virtual API yanıtı başarısız: {data.get('code', 'UNKNOWN')}")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ SMS Virtual bağlantı testi başarısız: {type(e).__name__}")
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
