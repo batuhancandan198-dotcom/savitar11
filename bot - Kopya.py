@@ -1,4 +1,5 @@
 import os
+import io
 import telebot
 from telebot import types
 from telebot import apihelper
@@ -16,13 +17,15 @@ apihelper.SESSION_TIME_TO_LIVE = 0
 bot = telebot.TeleBot(TOKEN)
 kullanici_durumu = {}
 
-TELEGRAM_MAX_LENGTH = 4000
-
-def send_long_result(chat_id, sonuc):
-    metin = f"📊 Sorgu Sonucu:\n\n{str(sonuc)}"
-    for i in range(0, len(metin), TELEGRAM_MAX_LENGTH):
-        parca = metin[i:i + TELEGRAM_MAX_LENGTH]
-        bot.send_message(chat_id, parca)
+def send_result_file(chat_id, sonuc):
+    icerik = f"📊 Sorgu Sonucu:\n\n{str(sonuc)}"
+    dosya = io.BytesIO(icerik.encode("utf-8"))
+    dosya.name = "sorgu_sonucu.txt"
+    bot.send_document(
+        chat_id,
+        dosya,
+        caption="📄 Sorgu sonucu dosya olarak hazır."
+    )
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -91,7 +94,7 @@ def handle_messages(message):
             elif durum == '🗺️ Ada Parsel Sorgu':
                 parcalar = text.split(",", 1)
                 sonuc = ajaxapi.ada_parsel(parcalar[0].strip(), parcalar[1].strip() if len(parcalar) > 1 else "")
-            send_long_result(chat_id, sonuc)
+            send_result_file(chat_id, sonuc)
         except Exception as e:
             bot.send_message(chat_id, f"❌ Sorgu sırasında bir hata oluştu veya kütüphane yanıt vermedi.\nHata: {str(e)}")
         kullanici_durumu[chat_id] = None
