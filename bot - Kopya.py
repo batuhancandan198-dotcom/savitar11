@@ -197,5 +197,12 @@ def handle_messages(message):
             bot.send_message(chat_id, f"❌ Sorgu sırasında bir hata oluştu veya kütüphane yanıt vermedi.\nHata: {str(e)}")
         kullanici_durumu[chat_id] = None
 
+# Long polling'e geçmeden önce olası eski webhook bağlantısını temizle.
+# Telegram'da getUpdates ve webhook aynı anda kullanılamaz.
+try:
+    bot.remove_webhook()
+except Exception:
+    pass
+
 print("Telegram Gelişmiş Sorgu Botu Aktif! Mesajlar bekleniyor...")
-bot.infinity_polling()
+bot.infinity_polling(skip_pending=True)
