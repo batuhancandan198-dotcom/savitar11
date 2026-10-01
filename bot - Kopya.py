@@ -1,5 +1,7 @@
 import os
 import io
+import json
+import urllib.request
 import telebot
 from telebot import types
 from telebot import apihelper
@@ -28,24 +30,55 @@ def send_result_file(chat_id, sonuc):
         caption="📄 Sorgu sonucu dosya olarak hazır."
     )
 
-@bot.message_handler(commands=['smsdurum'])
-def sms_durum(message):
+def sms_api_get(path):
     if not SMSV_API_KEY:
-        bot.send_message(message.chat.id, "❌ SMS Virtual API anahtarı Railway'de bulunamadı.")
-        return
-    try:
-        import urllib.request, json
-        req = urllib.request.Request("https://api.smsvirtual.io/v1/profile/", headers={"x-api-key": SMSV_API_KEY, "Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=15) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        if data.get("status") is True:
-            profile = data.get("data") or {}
-            balance = profile.get("balance", "bilinmiyor")
-            bot.send_message(message.chat.id, f"✅ SMS Virtual bağlantısı başarılı.\n💰 Bakiye: ${balance}")
-        else:
-            bot.send_message(message.chat.id, f"❌ SMS Virtual API yanıtı başarısız: {data.get('code', 'UNKNOWN')}")
-    except Exception as e:
-        bot.send_message(message.chat.id, f"❌ SMS Virtual bağlantı testi başarısız: {type(e).__name__}")
+        raise RuntimeError("SMS Virtual API anahtarı Railway'de bulunamadı.")
+    req = urllib.request.Request(
+        "https://api.smsvirtual.io/v1" + path,
+        headers={"x-api-key": SMSV_API_KEY, "Accept": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=15) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def sms_menu(message):
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    markup.add(
+        types.KeyboardButton("💰 SMS Bakiye"),
+        types.KeyboardButton("🌍 SMS Ülkeleri"),
+        types.KeyboardButton("📋 SMS Servisleri"),
+        types.KeyboardButton("📦 Aktif Numaralar"),
+        types.KeyboardButton("🔙 Ana Menüye Dön")
+    )
+    bot.send_message(
+        message.chat.id,
+        "📱 Sanal Numara Menüsü\n\nSMS Virtual hesabındaki bakiye, ülke/servis seçenekleri ve aktif numaralarını buradan görüntüleyebilirsin.",
+        reply_markup=markup
+    )
+
+
+def send_json_list(chat_id, title, data):
+    payload = data.get("data") if isinstance(data, dict) else data
+    text = title + "\n\n"
+    if isinstance(payload, list):
+        if not payload:
+            text += "Kayıt bulunamadı."
+        for item in payload[:40]:
+            if isinstance(item, dict):
+                parts = []
+                for key in ("id", "serviceId", "name", "code", "country", "countryCode"):
+                    if key in item and item[key] not in (None, ""):
+                        parts.append(f"{key}: {item[key]}")
+                text += "• " + (" | ".join(parts) if parts else str(item)) + "\n"
+            else:
+                text += "• " + str(item) + "\n"
+    elif isinstance(payload, dict):
+        for key, value in list(payload.items())[:40]:
+            text += f"• {key}: {value}\n"
+    else:
+        text += str(payload)
+    bot.send_message(chat_id, text[:4000])
+
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -54,6 +87,7 @@ def send_welcome(message):
     markup.add(
         types.KeyboardButton('📸 Fotoğraf Bakma'),
         types.KeyboardButton('🔍 Sorgulama Yap'),
+        types.KeyboardButton('📱 Sanal Numara'),
         types.KeyboardButton('❓ Yardım')
     )
     bot.send_message(chat_id=message.chat.id, text="👋 Merhaba! Yapmak istediğiniz işlemi seçin:", reply_markup=markup)
@@ -65,6 +99,50 @@ def handle_messages(message):
 
     if text == '📸 Fotoğraf Bakma':
         bot.send_message(chat_id, "📸 Fotoğraf bakma menüsündesiniz. Lütfen bir görsel gönderin.")
+
+    elif text == '📱 Sanal Numara':
+        sms_menu(message)
+
+    elif text == '💰 SMS Bakiye':
+        try:
+            data = sms_api_get("/profile/")
+            if data.get("status") is True:
+                profile = data.get("data") or {}
+                bot.send_message(chat_id, "💰 SMS Virtual Bakiye: $" + str(profile.get("balance", "bilinmiyor")))
+            else:
+                bot.send_message(chat_id, "❌ API hatası: " + str(data.get("code", "UNKNOWN")))
+        except Exception as e:
+            bot.send_message(chat_id, "❌ SMS Virtual bağlantı hatası: " + type(e).__name__)
+
+    elif text == '🌍 SMS Ülkeleri':
+        try:
+            data = sms_api_get("/country")
+            if data.get("status") is True:
+                send_json_list(chat_id, "🌍 SMS Virtual Ülkeleri", data)
+            else:
+                bot.send_message(chat_id, "❌ API hatası: " + str(data.get("code", "UNKNOWN")))
+        except Exception as e:
+            bot.send_message(chat_id, "❌ Ülke listesi alınamadı: " + type(e).__name__)
+
+    elif text == '📋 SMS Servisleri':
+        try:
+            data = sms_api_get("/services")
+            if data.get("status") is True:
+                send_json_list(chat_id, "📋 SMS Virtual Servisleri", data)
+            else:
+                bot.send_message(chat_id, "❌ API hatası: " + str(data.get("code", "UNKNOWN")))
+        except Exception as e:
+            bot.send_message(chat_id, "❌ Servis listesi alınamadı: " + type(e).__name__)
+
+    elif text == '📦 Aktif Numaralar':
+        try:
+            data = sms_api_get("/order/active")
+            if data.get("status") is True:
+                send_json_list(chat_id, "📦 Aktif SMS Virtual Numaraları", data)
+            else:
+                bot.send_message(chat_id, "❌ API hatası: " + str(data.get("code", "UNKNOWN")))
+        except Exception as e:
+            bot.send_message(chat_id, "❌ Aktif numaralar alınamadı: " + type(e).__name__)
     elif text == '🔍 Sorgulama Yap' or text == '🔙 Sorgu Menüsüne Dön':
         markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
         markup.add(
