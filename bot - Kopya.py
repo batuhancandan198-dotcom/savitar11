@@ -1,6 +1,7 @@
 import telebot
 import os
 from telebot import types
+import io
 import ajaxapi  # Orijinal sorgu kütüphaneniz
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -25,6 +26,15 @@ def send_welcome(message):
     
     markup.add(buton1, buton2, buton3)
     bot.send_message(message.chat.id, "👋 Merhaba! Yapmak istediğiniz işlemi seçin:", reply_markup=markup)
+
+# TXT gönderme mekanizmasının güvenli test komutu.
+# Hassas kişisel veri içermeyen sabit test çıktısı gönderir.
+@bot.message_handler(commands=['txttest'])
+def txt_test(message):
+    icerik = "TXT test çıktısı\n\nDosya gönderimi çalışıyor.\n"
+    dosya = io.BytesIO(icerik.encode("utf-8"))
+    dosya.name = "txt_test.txt"
+    bot.send_document(message.chat.id, dosya, caption="📄 TXT test dosyası")
 
 # 2. BUTON TIKLAMALARINI VE MENÜLERİ YÖNETEN KISIM
 @bot.message_handler(func=lambda message: True)
@@ -79,7 +89,7 @@ def handle_messages(message):
         kullanici_durumu[chat_id] = text
         bot.send_message(chat_id, "📝 Lütfen İl ve İlçe bilgisini aralarında virgül bırakarak yazın\n_(Örn: İSTANBUL, KADIKÖY)_:")
 
-    # --- KULLANICI METİN YAZDIĞINDA (SORGU SONUÇLARININ HESAPLANMAS LEAL ALANI) ---
+    # --- KULLANICI METİN YAZDIĞINDA ---
     else:
         durum = kullanici_durumu.get(chat_id)
         
@@ -110,7 +120,6 @@ def handle_messages(message):
             elif durum == '📞 GSM -> TC Sorgu':
                 sonuc = ajaxapi.gsm_tc(text)
             elif durum == '👤 Ad Soyad Sorgu':
-                # Gelen metni boşluktan ikiye bölüp ad ve soyad olarak gönderiyoruz
                 parcalar = text.split(" ", 1)
                 ad = parcalar[0]
                 soyad = parcalar[1] if len(parcalar) > 1 else ""
@@ -121,13 +130,12 @@ def handle_messages(message):
                 ilce = parcalar[1].strip() if len(parcalar) > 1 else ""
                 sonuc = ajaxapi.ada_parsel(il, ilce)
 
-            # Sonucu Telegram'dan kullanıcılara gönderiyoruz
+            # Mevcut sorgu sonucu gönderim davranışı korunuyor.
             bot.send_message(chat_id, f"📊 *Sorgu Sonucu:* \n\n{str(sonuc)}", parse_mode="Markdown")
             
         except Exception as e:
             bot.send_message(chat_id, f"❌ Sorgu sırasında bir hata oluştu veya kütüphane yanıt vermedi.\nHata: {str(e)}")
         
-        # Sorgu bittikten sonra kullanıcının durumunu sıfırlıyoruz
         kullanici_durumu[chat_id] = None
 
 # Kesintisiz çalışma döngüsü
