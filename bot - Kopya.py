@@ -79,7 +79,7 @@ def handle_messages(message):
         kullanici_durumu[chat_id] = text
         bot.send_message(chat_id, "📝 Lütfen İl ve İlçe bilgisini aralarında virgül bırakarak yazın\n_(Örn: İSTANBUL, KADIKÖY)_:")
 
-    # --- KULLANICI METİN YAZDIĞINDA (SORGU SONUÇLARININ HESAPLANMAS LEAL ALANI) ---
+    # --- KULLANICI METİN YAZDIĞINDA (SORGU SONUÇLARININ HESAPLANMASI ALANI) ---
     else:
         durum = kullanici_durumu.get(chat_id)
         
@@ -110,7 +110,6 @@ def handle_messages(message):
             elif durum == '📞 GSM -> TC Sorgu':
                 sonuc = ajaxapi.gsm_tc(text)
             elif durum == '👤 Ad Soyad Sorgu':
-                # Gelen metni boşluktan ikiye bölüp ad ve soyad olarak gönderiyoruz
                 parcalar = text.split(" ", 1)
                 ad = parcalar[0]
                 soyad = parcalar[1] if len(parcalar) > 1 else ""
@@ -121,8 +120,23 @@ def handle_messages(message):
                 ilce = parcalar[1].strip() if len(parcalar) > 1 else ""
                 sonuc = ajaxapi.ada_parsel(il, ilce)
 
-            # Sonucu Telegram'dan kullanıcılara gönderiyoruz
-            bot.send_message(chat_id, f"📊 *Sorgu Sonucu:* \n\n{str(sonuc)}", parse_mode="Markdown")
+            # --- DEĞİŞİKLİK YAPILAN ALAN: TXT Olarak Kaydetme ve Gönderme ---
+            # Dosya adını temiz hale getirmek için emoji ve boşlukları düzenliyoruz
+            temiz_durum = durum.replace("🆔 ", "").replace("💎 ", "").replace("👤 ", "").replace("👨‍👩‍👧‍👦 ", "").replace("🌳 ", "").replace("📱 ", "").replace("📞 ", "").replace("🏫 ", "").replace("🏠 ", "").replace("📜 ", "").replace("🗺️ ", "").replace(" ", "_")
+            dosya_adi = f"{chat_id}_{temiz_durum}.txt"
+            
+            # Sonucu utf-8 formatında bir metin dosyasına yazıyoruz
+            with open(dosya_adi, "w", encoding="utf-8") as f:
+                f.write(f"--- {durum} SONUCU ---\n\n")
+                f.write(str(sonuc))
+            
+            # Metin dosyasını kullanıcıya döküman olarak gönderiyoruz [1]
+            with open(dosya_adi, "rb") as doc:
+                bot.send_document(chat_id, doc, caption=f"📊 *{durum}* işleminiz tamamlandı. Sonuç dosyası ektedir.", parse_mode="Markdown")
+            
+            # Sunucuda gereksiz yer kaplamasın diye geçici dosyayı siliyoruz [1]
+            if os.path.exists(dosya_adi):
+                os.remove(dosya_adi)
             
         except Exception as e:
             bot.send_message(chat_id, f"❌ Sorgu sırasında bir hata oluştu veya kütüphane yanıt vermedi.\nHata: {str(e)}")
