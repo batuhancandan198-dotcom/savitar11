@@ -174,3 +174,5 @@ def handle_callback_queries(call):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Mesajları Yenile", callback_data=f"viewfree_{num_id}"))
         bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=sms_icerik, reply_markup=markup, parse_mode="Markdown")
+
+# --- BOTUN SÜREKLİ AKTİF KALMASINI SAĞLAYAN POLLING MOTORU ---
