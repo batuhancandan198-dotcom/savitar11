@@ -146,9 +146,27 @@ try:
     print("[BOOT 4] TeleBot olusturuldu", flush=True)
     me = bot.get_me()
     print(f"[BOOT 5] Telegram baglantisi OK: @{me.username}", flush=True)
-    print("[BOOT 6] Guvenli menu hazir", flush=True)
-    print("[BOOT 7] Polling baslatiliyor...", flush=True)
-    bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
+    try:
+        bot.delete_webhook(drop_pending_updates=False)
+        print("[BOOT 6] Webhook temizlendi", flush=True)
+    except Exception as exc:
+        print(f"[BOOT 6] Webhook temizleme uyarisi: {type(exc).__name__}: {exc}", flush=True)
+
+    print("[BOOT 7] Guvenli menu hazir", flush=True)
+    print("[BOOT 8] Polling baslatiliyor...", flush=True)
+
+    while True:
+        try:
+            bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
+        except Exception as exc:
+            msg = str(exc)
+            if "409" in msg and "getUpdates" in msg:
+                print("[POLLING] 409 Conflict: baska bir getUpdates istemcisi var. 15 sn sonra tekrar denenecek.", flush=True)
+                import time
+                time.sleep(15)
+                continue
+            raise
+
 except Exception as exc:
     print(f"[BOOT] UYGULAMA HATASI: {type(exc).__name__}: {exc}", flush=True)
     traceback.print_exc()
