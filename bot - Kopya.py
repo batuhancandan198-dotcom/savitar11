@@ -80,7 +80,7 @@ def web_sohbet_yaniti(soru):
         return "🤝 Ben de seninle tanıştığıma çok memnun oldum dostum! İyi ki varsın."
 
     saat_havuzu = ["saat kaç", "saat kac", "zaman ne"]
-    if any(k in soru_alt for k in saat_havuzu):
+    if any(k in soru_alt for kan saat_havuzu):
         return "⏰ Dijital dünyada zaman çok hızlı akıyor! Telefonunun veya bilgisayarının sağ alt köşesine bakarak tam zamanı görebilirsin dostum."
 
     sevinc_havuzu = ["yaşasın", "yasasin", "süper", "super", "yaşa", "harika", "olee", "oleyy"]
@@ -175,4 +175,4 @@ def handle_callback_queries(call):
         markup.add(types.InlineKeyboardButton("🔄 Mesajları Yenile", callback_data=f"viewfree_{num_id}"))
         bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=sms_icerik, reply_markup=markup, parse_mode="Markdown")
 
-# --- BOTUN SÜREKLİ AKTİF KALMASINI SAĞLAYAN POLLING MOTORU ---
+# --- KOPAN BAĞLANTIYI KURTARAN VE BOTU DİNLEMEDE TUTAN POLLING MOTORU ---
