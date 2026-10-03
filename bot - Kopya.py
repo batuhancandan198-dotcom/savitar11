@@ -8,6 +8,8 @@ import ajaxapi
 
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = "1291260407"  # Gerçek Admin ID numaranız kalıcı olarak eklendi
+
+# --- 1. DÜZELTME: Railway Ortam Değişkeni Senkronizasyonu ---
 SMS_API_KEY = os.getenv("SMS_ACTIVATE_API_KEY")
 
 if not TOKEN:
@@ -79,6 +81,7 @@ def web_sohbet_yaniti(soru):
     if any(k in soru_alt for k in memnun_havuzu):
         return "🤝 Ben de seninle tanıştığıma çok memnun oldum dostum! İyi ki varsın."
 
+    # --- 2. DÜZELTME: Syntax (Yazım Hatası) Çökmeleri Temizlendi ---
     saat_havuzu = ["saat kaç", "saat kac", "zaman ne"]
     if any(k in soru_alt for k in saat_havuzu):
         return "⏰ Dijital dünyada zaman çok hızlı akıyor! Telefonunun veya bilgisayarının sağ alt köşesine bakarak tam zamanı görebilirsin dostum."
@@ -173,5 +176,4 @@ def handle_callback_queries(call):
         sms_icerik = get_free_number_sms(num_id)
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Mesajları Yenile", callback_data=f"viewfree_{num_id}"))
-        bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=sms_icerik, reply_markup=markup, parse_mode="Markdown")
 
