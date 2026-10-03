@@ -2,6 +2,7 @@ import os
 import sys
 import traceback
 import json
+import time
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -9,7 +10,6 @@ print("[BOOT 1] main.py basladi", flush=True)
 
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    print("[BOOT 2] HATA: BOT_TOKEN yok", flush=True)
     raise RuntimeError("BOT_TOKEN Railway Variables içinde tanımlı değil.")
 
 print("[BOOT 2] BOT_TOKEN mevcut", flush=True)
@@ -48,8 +48,7 @@ def smsvirtual_profile():
     )
     try:
         with urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        return data, None
+            return json.loads(response.read().decode("utf-8")), None
     except HTTPError as exc:
         return None, f"API HTTP hatası: {exc.code}"
     except (URLError, TimeoutError) as exc:
@@ -58,7 +57,7 @@ def smsvirtual_profile():
         return None, f"API hatası: {type(exc).__name__}"
 
 def sohbet_yanit(metin):
-    m = metin.lower().strip()
+    m = (metin or "").lower().strip()
     if any(x in m for x in ("merhaba", "selam", "s.a", "sa")):
         return "👋 Selam kanka! Bot aktif. Ana menüden bir işlem seçebilirsin."
     if any(x in m for x in ("nasılsın", "nasilsin", "naber")):
@@ -69,15 +68,10 @@ def sohbet_yanit(metin):
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    bot.send_message(
-        message.chat.id,
-        "🤖 *Bot aktif!*
+    text = """🤖 Bot aktif!
 
-"
-        "Aşağıdaki güvenli özelliklerden birini seçebilirsin.",
-        reply_markup=ana_menu(),
-        parse_mode="Markdown",
-    )
+Aşağıdaki güvenli özelliklerden birini seçebilirsin."""
+    bot.send_message(message.chat.id, text, reply_markup=ana_menu())
 
 @bot.message_handler(commands=["id"])
 def user_id(message):
@@ -85,24 +79,15 @@ def user_id(message):
 
 @bot.message_handler(commands=["help"])
 def help_command(message):
-    bot.send_message(
-        message.chat.id,
-        "❓ *Yardım*
+    text = """❓ Yardım
 
-"
-        "📱 Sanal No — SMS Virtual hesabındaki bilgileri görüntüler.
-"
-        "💰 Bakiye — SMS Virtual hesap bakiyesini kontrol eder.
-"
-        "💬 Sohbet — Basit sohbet modu.
-"
-        "👤 Telegram ID — Telegram kullanıcı ID'nizi gösterir.
+📱 Sanal No — SMS Virtual hesabı için güvenli durum menüsü.
+💰 Bakiye — SMS Virtual hesap bakiyesini kontrol eder.
+💬 Sohbet — Basit sohbet modu.
+👤 Telegram ID — Telegram kullanıcı ID'nizi gösterir.
 
-"
-        "Komutlar: /start /id /help",
-        parse_mode="Markdown",
-        reply_markup=ana_menu(),
-    )
+Komutlar: /start /id /help"""
+    bot.send_message(message.chat.id, text, reply_markup=ana_menu())
 
 @bot.message_handler(func=lambda message: message.text == "👤 Telegram ID")
 def menu_id(message):
@@ -118,21 +103,18 @@ def balance(message):
     if error:
         bot.reply_to(message, f"⚠️ Bakiye alınamadı: {error}")
         return
+
     profile = data.get("profile", data) if isinstance(data, dict) else {}
-    balance_value = profile.get("balance", data.get("balance", "bilinmiyor")) if isinstance(profile, dict) else "bilinmiyor"
-    bot.reply_to(message, f"💰 SMS Virtual bakiye: {balance_value}")
+    value = profile.get("balance", "bilinmiyor") if isinstance(profile, dict) else "bilinmiyor"
+    bot.reply_to(message, f"💰 SMS Virtual bakiye: {value}")
 
 @bot.message_handler(func=lambda message: message.text == "📱 Sanal No")
 def virtual_number(message):
-    bot.send_message(
-        message.chat.id,
-        "📱 *Sanal Numara*
+    text = """📱 Sanal Numara
 
-"
-        "Bu menü şu anda yalnızca hesabın durumunu kontrol eder. "
-        "Numara satın alma veya doğrulama işlemi otomatikleştirilmemiştir.",
-        parse_mode="Markdown",
-    )
+Bu menü şu anda yalnızca hesap durumunu kontrol eder.
+Numara satın alma veya doğrulama işlemi otomatikleştirilmemiştir."""
+    bot.send_message(message.chat.id, text)
 
 @bot.message_handler(func=lambda message: message.text == "💬 Sohbet")
 def chat_mode(message):
@@ -140,12 +122,13 @@ def chat_mode(message):
 
 @bot.message_handler(func=lambda message: True)
 def text_handler(message):
-    bot.reply_to(message, sohbet_yanit(message.text or ""))
+    bot.reply_to(message, sohbet_yanit(message.text))
 
 try:
     print("[BOOT 4] TeleBot olusturuldu", flush=True)
     me = bot.get_me()
     print(f"[BOOT 5] Telegram baglantisi OK: @{me.username}", flush=True)
+
     try:
         bot.delete_webhook(drop_pending_updates=False)
         print("[BOOT 6] Webhook temizlendi", flush=True)
@@ -162,7 +145,6 @@ try:
             msg = str(exc)
             if "409" in msg and "getUpdates" in msg:
                 print("[POLLING] 409 Conflict: baska bir getUpdates istemcisi var. 15 sn sonra tekrar denenecek.", flush=True)
-                import time
                 time.sleep(15)
                 continue
             raise
