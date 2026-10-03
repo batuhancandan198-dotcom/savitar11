@@ -8,8 +8,6 @@ import ajaxapi
 
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = "1291260407"  # Gerçek Admin ID numaranız kalıcı olarak eklendi
-
-# --- 1. DÜZELTME: Railway Değişken Adı (SMSV_API_KEY) ---
 SMS_API_KEY = os.getenv("SMSV_API_KEY")
 
 if not TOKEN:
@@ -83,18 +81,20 @@ def web_sohbet_yaniti(soru):
 
     saat_havuzu = ["saat kaç", "saat kac", "zaman ne"]
     if any(k in soru_alt for k in saat_havuzu):
-        return "⏰ Dijital dünyada zaman çok hızlı akıyor! Telefonunun veya bilgisayarının sağ alt köşesine bakarak tam zamanı görebilirsin dostum."
+        return "⏰ Dijital dünyada zaman çok hızlı akıyor! Telefonunun veya bilgisayarının sağ alt köşesine bakarak tam zamanı görivelirsin dostum."
 
     sevinc_havuzu = ["yaşasın", "yasasin", "süper", "super", "yaşa", "harika", "olee", "oleyy"]
     if any(k in soru_alt for k in sevinc_havuzu):
         return "🎉 Leyyyt! Bu enerjiyi çok sevdim. Harikasın dostum, enerjimiz hep böyle yüksek olsun!"
-
     else:
         return (
             "🤖 Yazdığını web veritabanımda taradım dostum! Söylediğin şeyi anladım ama sohbet modunda şimdilik sadece "
             "günlük konuşmalar, vedalaşmalar, tanışma ve hal hatır sorma kalıplarına cevap verebiliyorum.\n\n"
             "Eğer sorgu veya sanal numara işlemi yapacaksan lütfen aşağıdaki butondan ana menüye dönüp işlemlerini başlat!"
-        )def get_free_numbers_from_web():
+        )
+
+# --- DOĞRU YERE ALINAN FONKSİYON BAŞLANGICI ---
+def get_free_numbers_from_web():
     try:
         demo_numbers = [
             {"id": "free_1", "country": "🇺🇸 ABD", "number": "+12135550192"},
@@ -175,9 +175,4 @@ def handle_callback_queries(call):
         markup.add(types.InlineKeyboardButton("🔄 Mesajları Yenile", callback_data=f"viewfree_{num_id}"))
         bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=sms_icerik, reply_markup=markup, parse_mode="Markdown")
 
-# --- KAPANMAYI ÖNLEYEN VE TÜM GÜNCELLEMELERİ DİNLEYEN POLLING MOTORU ---
-if __name__ == "__main__":
-    print("--------------------------------------------------")
-    print("🚀 BOT ARTIK KESİNTİSİZ OLARAK DİNLİYOR...")
-    print("--------------------------------------------------")
-    bot.infinity_polling(timeout=30, long_polling_timeout=15)
+# --- KESİNTİSİZ ÇALIŞAN POLLING MOTORU ---
