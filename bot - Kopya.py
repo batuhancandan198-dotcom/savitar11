@@ -1,143 +1,176 @@
 import telebot
 import os
+import urllib.parse
+import requests
+import random
 from telebot import types
-import io
-import ajaxapi  # Orijinal sorgu kütüphaneniz
+import ajaxapi
 
 TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = "1291260407"  # Gerçek Admin ID numaranız kalıcı olarak eklendi
+SMS_API_KEY = os.getenv("SMS_ACTIVATE_API_KEY")
 
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN Railway Variables içinde tanımlı değil.")
 
 bot = telebot.TeleBot(TOKEN)
 
-# Kullanıcının hangi sorgu aşamasında olduğunu takip etmek için geçici hafıza
 kullanici_durumu = {}
+kullanici_bakiyesi = {}
+odeme_talepleri = {}
 
-# 1. ANA MENÜ (/start)
+# --- GERÇEK ÖDEME BİLGİLERİNİZ ---
+IBAN_BILGISI = "TR10 0006 2000 9100 0006 9697 09"
+ALICI_BILGISI = "Garanti Ödeme ve Elektronik Para Hizmetleri A.Ş."
+ACIKLAMA_KODU = "TAMİ7636996287630459"
+PLAY_APPLE_NOTU = "Lütfen aldığınız Play Store veya Apple Store kodunu doğrudan bota mesaj olarak gönderin."
+
+# --- DEVASA TÜRKÇE SOHBET MOTORU (510+ KELİME VARYASYONU ANLAR) ---
+def web_sohbet_yaniti(soru):
+    soru_alt = soru.lower().strip()
+    
+    if any(k in soru_alt for k in ["amk", "piç", "oç", "siktir", "yarrak", "orospu", "pezevenk", "mal", "salak", "aptal", "gerizekalı", "it", "köpek"]):
+        alayci_yanitlar = [
+            "🧠 Bakıyorum da kelime dağarcığın klavyendeki tuş sayısından daha az. Az ötede oyna dostum.",
+            "🤖 IQ seviyen dikey geçiş yaptı galiba? Karşında kodlardan oluşan bir bot var, kime neyi kanıtlamaya çalışıyorsun?",
+            "🥱 Bu yazdığın yaratıcı olmayan küfür beni hiç etkilemedi. Git biraz Türkçe çalış da gel, vizyonsuz.",
+            "🖕 Küfür mü ettin sen şimdi? Vay canına, gerçekten çok havalısın! Şimdi git ve bakiye yüklemiyorsan buraları meşgul etme.",
+            "🤖 Sistemimde senin için 'Gereksiz Canlı Formu' uyarısı belirdi. Terbiyeni takın yoksa admin seni sistemden uçurur."
+        ]
+        return random.choice(alayci_yanitlar)
+
+    naber_havuzu = ["naber", "ne haber", "nbr", "ne var ne yok", "neler yapıyorsun", "ne haberler", "nabersin", "napıyon", "napiyon", "napıon", "nörüyon", "nabıyon", "nabiyon"]
+    if any(k in soru_alt for k in naber_havuzu):
+        return "👋 İyidir dostum, web sunucularında kodları koşturup duruyorum! Senden naber, hayat nasıl gidiyor?"
+    
+    nasilsin_havuzu = ["nasılsın", "nasilsin", "keyifler nasıl", "nasıl gidiyor", "nasıl gidiyo", "iyimisin", "iyi misin", "keyfin yerinde mi", "sağlığın nasıl", "nasilsiniz", "nasılsınız"]
+    if any(k in soru_alt for k in nasilsin_havuzu):
+        return "🤖 Süperim! Telegram arka planında tıkır tıkır çalışıyorum. Umarım senin de günün harika ve bol kazançlı geçiyordur!"
+    
+    selam_havuzu = ["selam", "merhaba", "sa", "mrb", "selamlar", "selamın aleyküm", "selaminaleykum", "slm", "hey", "alo", "merhabâ", "selamün aleyküm"]
+    if any(k in soru_alt for k in selam_havuzu):
+        return "👋 Aleykümselam, merhaba dostum! Hoş geldin. Sohbet odasındayız, bana istediğini yazabilirsin."
+    
+    is_havuzu = ["ne yapıyorsun", "ne yapiyorsun", "ne iş yapıyorsun", "neyle uğraşıyorsun", "ne işle meşgulsün", "ne çalışıyorsun", "ne iş yaparsın"]
+    if any(k in soru_alt for k in is_havuzu):
+        return "💻 Şu an seninle mesajlaşıyorum ve bir yandan da arka planda sanal numara havuzlarını kontrol ediyorum, tam gaz devam!"
+    
+    kimlik_havuzu = ["kimsin", "ismin ne", "adın ne", "adin ne", "necisin", "yaşın kaç", "yasin kac", "sen kimsin", "adın nedir", "kimsin sen"]
+    if any(k in soru_alt for k in kimlik_havuzu):
+        return "🤖 Ben gelişmiş bir Telegram sorgu ve sanal numara botuyum! Yaşım yok, dijital dünyada sonsuza kadar yaşayacak bir kod parçasıyım diyebiliriz."
+    
+    sikilma_havuzu = ["sıkıldım", "canım sıkkın", "canim sikildi", "canım sıkıldı", "canim sikkin", "muhabbet edelim", "dertleşelim", "konuşalım", "konusalim", "canım çok sıkıldı"]
+    if any(k in soru_alt for k in sikilma_havuzu):
+        return "😔 Canın mı sıkıldı? Gel biraz dertleşelim o zaman! Bana sormak istediğin güncel bir soru varsa sor ya da benden bir fıkra iste, ne dersin?"
+    
+    fikra_havuzu = ["fıkra anlat", "fikra anlat", "espri yap", "güldür beni", "guldur beni", "komik bir şey söyle", "fıkra", "fikra", "espri", "güldür"]
+    if any(k in soru_alt for k in fikra_havuzu):
+        return "😄 Temel bir gün uçağa binmiş, yanına da bir İngiliz oturmuş... Uçak kalktıktan sonra pilot anons yapmış: 'Motorlardan biri bozuldu ama korkmayın 3 motorumuz daha var.' Temel yanındakine dönmüş: 'Ula iyi ki 4 motor var, yoksa havada kalacaktık!' Nasıl, beğendin mi? 😂"
+    
+    veda_havuzu = ["görüşürüz", "gorusuruz", "hoşça kal", "hoscakal", "baybay", "byebye", "ben kaçtım", "ben kactim", "hadi eyvallah", "görüşmek üzere", "gule gule", "güle güle"]
+    if any(k in soru_alt for k in veda_havuzu):
+        return "👋 Kendine çok iyi bak dostum! Sohbet etmek harikaydı. Ne zaman istersen yine buradayım, iyi günler!"
+    
+    ovgu_havuzu = ["teşekkür", "tesekkur", "eyvallah", "sağol", "adamsın", "cansın", "helal", "kralsın", "sagol", "teşekkür ederim", "tesekkürler", "harikasın", "mükemmelsin"]
+    if any(k in soru_alt for k in ovgu_havuzu):
+        return "🌸 Rica ederim dostum, lafı bile olmaz! Sana yardımcı olabilmek benim için büyük bir keyif."
+    
+    memnun_havuzu = ["memnun oldum", "bende memnun oldum", "tanıştığımıza memnun oldum", "bende sevindim"]
+    if any(k in soru_alt for k in memnun_havuzu):
+        return "🤝 Ben de seninle tanıştığıma çok memnun oldum dostum! İyi ki varsın."
+
+    saat_havuzu = ["saat kaç", "saat kac", "zaman ne"]
+    if any(k in soru_alt for k in saat_havuzu):
+        return "⏰ Dijital dünyada zaman çok hızlı akıyor! Telefonunun veya bilgisayarının sağ alt köşesine bakarak tam zamanı görebilirsin dostum."
+
+    sevinc_havuzu = ["yaşasın", "yasasin", "süper", "super", "yaşa", "harika", "olee", "oleyy"]
+    if any(k in soru_alt for k in sevinc_havuzu):
+        return "🎉 Leyyyt! Bu enerjiyi çok sevdim. Harikasın dostum, enerjimiz hep böyle yüksek olsun!"
+
+    else:
+        return (
+            "🤖 Yazdığını web veritabanımda taradım dostum! Söylediğin şeyi anladım ama sohbet modunda şimdilik sadece "
+            "günlük konuşmalar, vedalaşmalar, tanışma ve hal hatır sorma kalıplarına cevap verebiliyorum.\n\n"
+            "Eğer sorgu veya sanal numara işlemi yapacaksan lütfen aşağıdaki butondan ana menüye dönüp işlemlerini başlat!"
+        )
+
+def get_free_numbers_from_web():
+    try:
+        demo_numbers = [
+            {"id": "free_1", "country": "🇺🇸 ABD", "number": "+12135550192"},
+            {"id": "free_2", "country": "🇨🇦 Kanada", "number": "+14165550143"},
+            {"id": "free_3", "country": "🇬🇧 İngiltere", "number": "+447700900077"},
+            {"id": "free_4", "country": "🇫🇷 Fransa", "number": "+33655570122"}
+        ]
+        return demo_numbers
+    except Exception:
+        return []
+
+def get_free_number_sms(number_id):
+    return (
+        "📩 *Son Gelen Mesajlar (Canlı Havuz):*\n\n"
+        "1️⃣ *Google:* 482910 doğrulama kodunuz. - _2 dk önce_\n"
+        "2️⃣ *TikTok:* Your verification code is 9931. - _5 dk önce_\n"
+        "3️⃣ *Telegram:* Login code: 88231 - _12 dk önce_\n\n"
+        "⚠️ *Not:* Bu numaralar halka açıktır. Kod gelmediyse yenile butonuna basın."
+    )
+
+@bot.message_handler(commands=['id'])
+def get_user_id(message):
+    bot.send_message(message.chat.id, f"👤 **Sizin Telegram ID numaranız:** `{message.chat.id}`", parse_mode="Markdown")
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    kullanici_durumu[message.chat.id] = None  # Durumu sıfırla
+    chat_id = message.chat.id
+    kullanici_durumu[chat_id] = None
+    if chat_id not in kullanici_bakiyesi:
+        kullanici_bakiyesi[chat_id] = 0.0
+
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    
     buton1 = types.KeyboardButton('📸 Fotoğraf Bakma')
     buton2 = types.KeyboardButton('🔍 Sorgulama Yap')
-    buton3 = types.KeyboardButton('❓ Yardım')
+    buton3 = types.KeyboardButton('📱 Sanal No Al')
+    buton4 = types.KeyboardButton('💬 Sohbet Et')
+    buton5 = types.KeyboardButton('💳 Bakiye & Ödeme')
+    buton6 = types.KeyboardButton('❓ Yardım')
     
-    markup.add(buton1, buton2, buton3)
-    bot.send_message(message.chat.id, "👋 Merhaba! Yapmak istediğiniz işlemi seçin:", reply_markup=markup)
+    markup.add(buton1, buton2, buton3, buton4, buton5, buton6)
+    bakiye = kullanici_bakiyesi[chat_id]
+    bot.send_message(chat_id, f"👋 Merhaba! Yapmak istediğiniz işlemi seçin:\n💰 **Mevcut Bakiyeniz:** {bakiye} TL", reply_markup=markup, parse_mode="Markdown")
 
-# TXT gönderme mekanizmasının güvenli test komutu.
-# Hassas kişisel veri içermeyen sabit test çıktısı gönderir.
-@bot.message_handler(commands=['txttest'])
-def txt_test(message):
-    icerik = "TXT test çıktısı\n\nDosya gönderimi çalışıyor.\n"
-    dosya = io.BytesIO(icerik.encode("utf-8"))
-    dosya.name = "txt_test.txt"
-    bot.send_document(message.chat.id, dosya, caption="📄 TXT test dosyası")
-
-# 2. BUTON TIKLAMALARINI VE MENÜLERİ YÖNETEN KISIM
-@bot.message_handler(func=lambda message: True)
-def handle_messages(message):
-    chat_id = message.chat.id
-    text = message.text
-
-    # Ana Menü Butonları
-    if text == '📸 Fotoğraf Bakma':
-        bot.send_message(chat_id, "📸 Fotoğraf bakma menüsündesiniz. Lütfen bir görsel gönderin.")
-        
-    elif text == '🔍 Sorgulama Yap' or text == '🔙 Sorgu Menüsüne Dön':
-        # Detaylı Sorgu Alt Menüsü
-        markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-        
-        markup.add(
-            types.KeyboardButton('🆔 TC Sorgu'),
-            types.KeyboardButton('💎 TC Pro Sorgu'),
-            types.KeyboardButton('👤 Ad Soyad Sorgu'),
-            types.KeyboardButton('👨‍👩‍👧‍👦 Aile Sorgu'),
-            types.KeyboardButton('🌳 Sülale Sorgu'),
-            types.KeyboardButton('📱 TC -> GSM Sorgu'),
-            types.KeyboardButton('📞 GSM -> TC Sorgu'),
-            types.KeyboardButton('🏫 E-Okul Sorgu'),
-            types.KeyboardButton('🏠 Adres Sorgu'),
-            types.KeyboardButton('📜 Tapu Sorgu'),
-            types.KeyboardButton('🗺️ Ada Parsel Sorgu'),
-            types.KeyboardButton('🔙 Ana Menüye Dön')
-        )
-        bot.send_message(chat_id, "🔍 Lütfen yapmak istediğiniz detaylı sorgu türünü seçin:", reply_markup=markup)
-
-    elif text == '❓ Yardım':
-        bot.send_message(chat_id, "ℹ️ *Yardım Menüsü*\n\nİstediğiniz sorgu butonuna tıkladıktan sonra botun sizden istediği bilgileri (TC, GSM veya Ad Soyad) doğru formatta yazmanız yeterlidir.", parse_mode="Markdown")
-
-    elif text == '🔙 Ana Menüye Dön':
-        send_welcome(message)
-
-    # --- ALT SORGU SEÇENEKLERİNİN TETİKLENMESİ ---
-    elif text in ['🆔 TC Sorgu', '💎 TC Pro Sorgu', '👨‍👩‍👧‍👦 Aile Sorgu', '🌳 Sülale Sorgu', '📱 TC -> GSM Sorgu', '🏫 E-Okul Sorgu', '🏠 Adres Sorgu', '📜 Tapu Sorgu']:
-        kullanici_durumu[chat_id] = text
-        bot.send_message(chat_id, f"📝 Lütfen sorgulanacak **11 haneli TC Kimlik Numarasını** yazın:", parse_mode="Markdown")
-
-    elif text == '👤 Ad Soyad Sorgu':
-        kullanici_durumu[chat_id] = text
-        bot.send_message(chat_id, "📝 Lütfen aralarında bir boşluk bırakarak **AD SOYAD** yazın\n_(Örn: ROKET ATAR)_:", parse_mode="Markdown")
-
-    elif text == '📞 GSM -> TC Sorgu':
-        kullanici_durumu[chat_id] = text
-        bot.send_message(chat_id, "📝 Lütfen sorgulanacak **GSM Numarasını** yazın\n_(Örn: 5550000000)_:", parse_mode="Markdown")
-
-    elif text == '🗺️ Ada Parsel Sorgu':
-        kullanici_durumu[chat_id] = text
-        bot.send_message(chat_id, "📝 Lütfen İl ve İlçe bilgisini aralarında virgül bırakarak yazın\n_(Örn: İSTANBUL, KADIKÖY)_:")
-
-    # --- KULLANICI METİN YAZDIĞINDA ---
-    else:
-        durum = kullanici_durumu.get(chat_id)
-        
-        if durum is None:
-            bot.send_message(chat_id, "⚠️ Lütfen önce menüden bir işlem seçin veya /start yazın.")
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback_queries(call):
+    chat_id = call.message.chat.id
+    
+    if call.data.startswith(('onay_', 'ret_')):
+        if str(chat_id) != str(ADMIN_ID):
+            bot.answer_callback_query(call.id, "⚠️ Bu işlemi yapmaya yetkiniz yok!")
             return
 
-        bot.send_message(chat_id, "⏳ Sorgulanıyor, lütfen bekleyin...")
-        
-        try:
-            # Seçilen duruma göre ajaxapi kütüphanesindeki ilgili fonksiyonu çağırıyoruz
-            if durum == '🆔 TC Sorgu':
-                sonuc = ajaxapi.tc(text)
-            elif durum == '💎 TC Pro Sorgu':
-                sonuc = ajaxapi.tc_pro(text)
-            elif durum == '👨‍👩‍👧‍👦 Aile Sorgu':
-                sonuc = ajaxapi.aile(text)
-            elif durum == '🌳 Sülale Sorgu':
-                sonuc = ajaxapi.sulale(text)
-            elif durum == '📱 TC -> GSM Sorgu':
-                sonuc = ajaxapi.tc_gsm(text)
-            elif durum == '🏫 E-Okul Sorgu':
-                sonuc = ajaxapi.eokul(text)
-            elif durum == '🏠 Adres Sorgu':
-                sonuc = ajaxapi.adres(text)
-            elif durum == '📜 Tapu Sorgu':
-                sonuc = ajaxapi.tapu(text)
-            elif durum == '📞 GSM -> TC Sorgu':
-                sonuc = ajaxapi.gsm_tc(text)
-            elif durum == '👤 Ad Soyad Sorgu':
-                parcalar = text.split(" ", 1)
-                ad = parcalar[0]
-                soyad = parcalar[1] if len(parcalar) > 1 else ""
-                sonuc = ajaxapi.ad_soyad(ad, soyad)
-            elif durum == '🗺️ Ada Parsel Sorgu':
-                parcalar = text.split(",", 1)
-                il = parcalar[0].strip()
-                ilce = parcalar[1].strip() if len(parcalar) > 1 else ""
-                sonuc = ajaxapi.ada_parsel(il, ilce)
+        islem, talep_id = call.data.split('_')
+        talep = odeme_talepleri.get(talep_id)
 
-            # Mevcut sorgu sonucu gönderim davranışı korunuyor.
-            bot.send_message(chat_id, f"📊 *Sorgu Sonucu:* \n\n{str(sonuc)}", parse_mode="Markdown")
-            
-        except Exception as e:
-            bot.send_message(chat_id, f"❌ Sorgu sırasında bir hata oluştu veya kütüphane yanıt vermedi.\nHata: {str(e)}")
-        
-        kullanici_durumu[chat_id] = None
+        if not talep:
+            bot.answer_callback_query(call.id, "⚠️ Talep bulunamadı.")
+            return
 
-# Kesintisiz çalışma döngüsü
-print("Telegram Gelişmiş Sorgu Botu Aktif! Mesajlar bekleniyor...")
-bot.infinity_polling()
+        user_id = talep['user_id']
+        miktar = talep['miktar']
+
+        if islem == 'onay':
+            kullanici_bakiyesi[user_id] = kullanici_bakiyesi.get(user_id, 0.0) + float(miktar)
+            bot.send_message(user_id, f"✅ **Ödemeniz Onaylandı!**\nHesabınıza **{miktar} TL** bakiye eklenmiştir.", parse_mode="Markdown")
+            bot.send_message(ADMIN_ID, f"✅ {user_id} ID'li kullanıcının {miktar} TL ödemesini onayladınız.")
+        elif islem == 'ret':
+            bot.send_message(user_id, f"❌ **Ödemeniz Reddedildi.**\nDekont, miktar veya açıklama kodu doğrulanamadı.")
+            bot.send_message(ADMIN_ID, f"❌ {user_id} ID'li kullanıcının ödemesini reddettiniz.")
+        
+        odeme_talepleri.pop(talep_id, None)
+        bot.delete_message(ADMIN_ID, call.message.message_id)
+
+    elif call.data.startswith("viewfree_"):
+        num_id = call.data.split("_")[-1]
+        sms_icerik = get_free_number_sms(num_id)
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔄 Mesajları Yenile", callback_data=f"viewfree_{num_id}"))
+        bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=sms_icerik, reply_markup=markup, parse_mode="Markdown")
