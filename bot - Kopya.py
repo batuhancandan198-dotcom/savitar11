@@ -9,7 +9,7 @@ import ajaxapi
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = "1291260407"  # Gerçek Admin ID numaranız kalıcı olarak eklendi
 
-# --- 1. DÜZELTME: Railway Değişken Adı Tam Uyumlu Hale Getirildi ---
+# --- 1. DÜZELTME: Railway Değişken Adı (SMSV_API_KEY) ---
 SMS_API_KEY = os.getenv("SMSV_API_KEY")
 
 if not TOKEN:
@@ -27,7 +27,7 @@ ALICI_BILGISI = "Garanti Ödeme ve Elektronik Para Hizmetleri A.Ş."
 ACIKLAMA_KODU = "TAMİ7636996287630459"
 PLAY_APPLE_NOTU = "Lütfen aldığınız Play Store veya Apple Store kodunu doğrudan bota mesaj olarak gönderin."
 
-# --- DEVASA TÜRKÇE SOHBET MOTORU (510+ KELİME VARYASYONU ANLAR) ---
+# --- DEVASA TÜRKÇE SOHBET MOTORU ---
 def web_sohbet_yaniti(soru):
     soru_alt = soru.lower().strip()
     
@@ -94,9 +94,7 @@ def web_sohbet_yaniti(soru):
             "🤖 Yazdığını web veritabanımda taradım dostum! Söylediğin şeyi anladım ama sohbet modunda şimdilik sadece "
             "günlük konuşmalar, vedalaşmalar, tanışma ve hal hatır sorma kalıplarına cevap verebiliyorum.\n\n"
             "Eğer sorgu veya sanal numara işlemi yapacaksan lütfen aşağıdaki butondan ana menüye dönüp işlemlerini başlat!"
-        )
-
-def get_free_numbers_from_web():
+        )def get_free_numbers_from_web():
     try:
         demo_numbers = [
             {"id": "free_1", "country": "🇺🇸 ABD", "number": "+12135550192"},
@@ -140,7 +138,6 @@ def send_welcome(message):
     bakiye = kullanici_bakiyesi[chat_id]
     bot.send_message(chat_id, f"👋 Merhaba! Yapmak istediğiniz işlemi seçin:\n💰 **Mevcut Bakiyeniz:** {bakiye} TL", reply_markup=markup, parse_mode="Markdown")
 
-# --- 2. DÜZELTME: Callback Fonksiyonunun Sonu Tamamlandı ---
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback_queries(call):
     chat_id = call.message.chat.id
@@ -176,3 +173,11 @@ def handle_callback_queries(call):
         sms_icerik = get_free_number_sms(num_id)
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Mesajları Yenile", callback_data=f"viewfree_{num_id}"))
+        bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=sms_icerik, reply_markup=markup, parse_mode="Markdown")
+
+# --- KAPANMAYI ÖNLEYEN VE TÜM GÜNCELLEMELERİ DİNLEYEN POLLING MOTORU ---
+if __name__ == "__main__":
+    print("--------------------------------------------------")
+    print("🚀 BOT ARTIK KESİNTİSİZ OLARAK DİNLİYOR...")
+    print("--------------------------------------------------")
+    bot.infinity_polling(timeout=30, long_polling_timeout=15)
